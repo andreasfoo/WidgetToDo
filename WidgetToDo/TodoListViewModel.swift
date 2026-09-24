@@ -120,29 +120,26 @@ final class TodoListViewModel: ObservableObject {
     }
 
     func toggleTask(_ task: TaskItem) async {
-        do {
-            let updated = try await repository.toggleTask(id: task.id, isDone: !task.isDone)
-            tasks = TaskSorting.sort(tasks.map { $0.id == updated.id ? updated : $0 })
-            errorMessage = nil
-        } catch {
-            tasks = TaskSorting.sort(tasks.map {
-                guard $0.id == task.id else { return $0 }
-                var failed = task
-                failed.isDone.toggle()
-                failed.syncStatus = .failed
-                return failed
-            })
-            errorMessage = AppMessage(.taskUpdateFailed, arguments: [error.localizedDescription])
-        }
+        await queueTaskToggle(id: task.id, isDone: !task.isDone, failureKey: .taskUpdateFailed)
     }
 
     func retry(_ task: TaskItem) async {
+        await queueTaskToggle(id: task.id, isDone: task.isDone, failureKey: .taskRetryFailed)
+    }
+
+    private func queueTaskToggle(id: String, isDone: Bool, failureKey: AppText.Key) async {
         do {
-            let updated = try await repository.retryTask(id: task.id)
+            let updated = try await repository.toggleTask(id: id, isDone: isDone)
             tasks = TaskSorting.sort(tasks.map { $0.id == updated.id ? updated : $0 })
             errorMessage = nil
+            Task { [weak self] in
+                guard let self else { return }
+                _ = await repository.drainPendingMutations()
+                guard let refreshed = try? await repository.cachedTask(id: id) else { return }
+                tasks = TaskSorting.sort(tasks.map { $0.id == refreshed.id ? refreshed : $0 })
+            }
         } catch {
-            errorMessage = AppMessage(.taskRetryFailed, arguments: [error.localizedDescription])
+            errorMessage = AppMessage(failureKey, arguments: [error.localizedDescription])
         }
     }
 
@@ -437,15 +434,9 @@ final class TodoListViewModel: ObservableObject {
         finishedPomodoro?.durationWriteSucceeded = true
 
         if pomodoroCompleteTaskToggle {
-            do {
-                let updated = try await repository.toggleTask(id: context.taskID, isDone: true)
-                guard finishedPomodoro?.taskID == context.taskID else { return }
-                tasks = TaskSorting.sort(tasks.map { $0.id == updated.id ? updated : $0 })
-                pomodoroPrompt = .success(completedTask: true, minutesToAdd: context.minutesToAdd)
-            } catch {
-                errorMessage = AppMessage(.taskUpdateFailed, arguments: [error.localizedDescription])
-                pomodoroPrompt = .success(completedTask: false, minutesToAdd: context.minutesToAdd)
-            }
+            await queueTaskToggle(id: context.taskID, isDone: true, failureKey: .taskUpdateFailed)
+            guard finishedPomodoro?.taskID == context.taskID else { return }
+            pomodoroPrompt = .success(completedTask: true, minutesToAdd: context.minutesToAdd)
         } else {
             pomodoroPrompt = .success(completedTask: false, minutesToAdd: context.minutesToAdd)
         }
@@ -459,15 +450,9 @@ final class TodoListViewModel: ObservableObject {
         pomodoroPrompt = nil
 
         if pomodoroCompleteTaskToggle {
-            do {
-                let updated = try await repository.toggleTask(id: context.taskID, isDone: true)
-                guard finishedPomodoro?.taskID == context.taskID else { return }
-                tasks = TaskSorting.sort(tasks.map { $0.id == updated.id ? updated : $0 })
-                pomodoroPrompt = .success(completedTask: true, minutesToAdd: context.minutesToAdd)
-            } catch {
-                errorMessage = AppMessage(.taskUpdateFailed, arguments: [error.localizedDescription])
-                pomodoroPrompt = .success(completedTask: false, minutesToAdd: context.minutesToAdd)
-            }
+            await queueTaskToggle(id: context.taskID, isDone: true, failureKey: .taskUpdateFailed)
+            guard finishedPomodoro?.taskID == context.taskID else { return }
+            pomodoroPrompt = .success(completedTask: true, minutesToAdd: context.minutesToAdd)
         } else {
             pomodoroPrompt = .success(completedTask: false, minutesToAdd: context.minutesToAdd)
         }

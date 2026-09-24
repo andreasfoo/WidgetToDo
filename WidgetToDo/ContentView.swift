@@ -377,11 +377,11 @@ struct OnboardingView: View {
                             languageSection
                         }
 
+                        tokenSection
+
                         if mode == .settings, let hideCompletedTasks {
                             completedTasksVisibilitySection(hideCompletedTasks)
                         }
-
-                        tokenSection
                         databaseSection(
                             title: languageStore.text(mode == .settings ? .tasksDatabaseID : .tasksDatabase),
                             placeholder: languageStore.text(mode == .settings ? .tasksDatabasePrompt : .pasteFullURL),

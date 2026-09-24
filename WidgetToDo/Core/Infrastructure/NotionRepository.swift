@@ -44,6 +44,8 @@ public actor NotionRepository {
                 title: settings.tasksFieldMapping.title,
                 date: settings.tasksFieldMapping.date,
                 done: settings.tasksFieldMapping.done,
+                doneType: settings.tasksFieldMapping.doneType,
+                completedStatusName: settings.tasksFieldMapping.completedStatusName,
                 priority: discoveredMapping.priority,
                 priorityOptions: discoveredMapping.priorityOptions,
                 estimatedMinutes: settings.tasksFieldMapping.estimatedMinutes

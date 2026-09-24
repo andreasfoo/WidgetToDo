@@ -159,6 +159,28 @@ final class FieldMappingResolutionTests: XCTestCase {
         }
     }
 
+    func testResolveTaskFieldMappingUsesCompletedStatusWhenCheckboxIsAbsent() {
+        let result = FieldValidator.resolve([
+            NotionPropertySchema(name: "任务标题", type: "title"),
+            NotionPropertySchema(name: "计划日期", type: "date"),
+            NotionPropertySchema(name: "状态", type: "status", completedStatusName: "Done")
+        ], for: .tasks)
+
+        guard case let .success(.tasks(mapping)) = result else {
+            return XCTFail("Expected a status-backed task field mapping")
+        }
+        XCTAssertEqual(mapping.done, "状态")
+        XCTAssertEqual(mapping.doneType, .status)
+        XCTAssertEqual(mapping.completedStatusName, "Done")
+    }
+
+    func testTaskFieldMappingDecodesLegacyCheckboxConfiguration() throws {
+        let json = #"{"title":"Name","date":"Date","done":"Done","priority":null,"priorityOptions":[]}"#
+        let mapping = try JSONDecoder().decode(TaskDatabaseFieldMapping.self, from: Data(json.utf8))
+        XCTAssertEqual(mapping.doneType, .checkbox)
+        XCTAssertNil(mapping.completedStatusName)
+    }
+
     func testAppSettingsDecodesLegacyPayloadWithDefaultFieldMappings() throws {
         let json = #"""
         {

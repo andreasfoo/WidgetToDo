@@ -38,18 +38,23 @@ public enum FieldValidator {
         var issues: [ValidationIssue] = []
         let title = resolveRequiredField(in: properties, type: "title", issues: &issues)
         let date = resolveRequiredField(in: properties, type: "date", issues: &issues)
-        let done = resolveRequiredField(in: properties, type: "checkbox", issues: &issues)
-
-        guard let title, let date, let done, issues.isEmpty else {
-            return .failure(issues)
+        let checkboxFields = properties.filter { $0.type == "checkbox" }
+        let statusFields = properties.filter { $0.type == "status" && $0.completedStatusName != nil }
+        let completionFields = checkboxFields.map { ($0, TaskDoneFieldType.checkbox) } + statusFields.map { ($0, TaskDoneFieldType.status) }
+        guard completionFields.count == 1 else {
+            issues.append(ValidationIssue(.missingRequiredFieldType, arguments: ["checkbox or status"])); return .failure(issues)
         }
+        guard let title, let date, issues.isEmpty else { return .failure(issues) }
+        let (doneField, doneType) = completionFields[0]
 
         let priorityCandidates = properties.filter { $0.type == "select" }
         let estimatedMinutesCandidates = propertyNames(in: properties, matching: "number")
         let mapping = TaskDatabaseFieldMapping(
             title: title,
             date: date,
-            done: done,
+            done: doneField.name,
+            doneType: doneType,
+            completedStatusName: doneField.completedStatusName,
             priority: priorityCandidates.count == 1 ? priorityCandidates[0].name : nil,
             priorityOptions: priorityCandidates.count == 1 ? priorityCandidates[0].selectOptions : [],
             estimatedMinutes: estimatedMinutesCandidates.count == 1 ? estimatedMinutesCandidates[0] : nil

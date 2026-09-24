@@ -5,6 +5,8 @@ public enum AppText {
         case languageSettingTitle
         case settingsTitle
         case saveSettings
+        case hideCompletedTasks
+        case hideCompletedTasksDescription
         case savingLanguageFailed
         case toggleWidget
         case quit
@@ -181,6 +183,8 @@ public enum AppText {
             .languageSettingTitle: "Language",
             .settingsTitle: "设置",
             .saveSettings: "保存设置",
+            .hideCompletedTasks: "隐藏已完成任务",
+            .hideCompletedTasksDescription: "开启后，任务列表不显示已完成的事项。",
             .savingLanguageFailed: "保存语言设置失败，请稍后重试。",
             .toggleWidget: "显示 / 隐藏 Notion 浮窗",
             .quit: "退出",
@@ -355,6 +359,8 @@ public enum AppText {
             .languageSettingTitle: "Language",
             .settingsTitle: "Settings",
             .saveSettings: "Save Settings",
+            .hideCompletedTasks: "Hide completed tasks",
+            .hideCompletedTasksDescription: "Completed tasks are removed from the task list.",
             .savingLanguageFailed: "Could not save the language setting. Please try again.",
             .toggleWidget: "Show / Hide Notion Widget",
             .quit: "Quit",
@@ -529,6 +535,8 @@ public enum AppText {
             .languageSettingTitle: "Language",
             .settingsTitle: "Paramètres",
             .saveSettings: "Enregistrer les paramètres",
+            .hideCompletedTasks: "Masquer les tâches terminées",
+            .hideCompletedTasksDescription: "Les tâches terminées ne sont plus affichées dans la liste.",
             .savingLanguageFailed: "Impossible d’enregistrer le réglage de langue. Réessayez.",
             .toggleWidget: "Afficher / masquer le widget Notion",
             .quit: "Quitter",

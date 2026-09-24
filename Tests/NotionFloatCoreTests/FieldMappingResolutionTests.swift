@@ -197,5 +197,6 @@ final class FieldMappingResolutionTests: XCTestCase {
 
         XCTAssertEqual(settings.tasksFieldMapping, .legacyDefault)
         XCTAssertEqual(settings.journalFieldMapping, .legacyDefault)
+        XCTAssertFalse(settings.hideCompletedTasks)
     }
 }

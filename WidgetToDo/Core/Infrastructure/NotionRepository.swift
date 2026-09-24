@@ -212,6 +212,8 @@ public actor NotionRepository {
         return url
     }
 
+    /// Persists the toggle locally before returning so the UI does not wait for Notion.
+    /// `drainPendingMutations()` performs the network write asynchronously.
     public func toggleTask(id: String, isDone: Bool) async throws -> TaskItem {
         guard var task = try cache.task(id: id) else {
             throw NotionRepositoryError.missingCacheRecord("任务缓存记录不存在。")
@@ -220,34 +222,17 @@ public actor NotionRepository {
         task.isDone = isDone
         task.syncStatus = .localPending
         try cache.upsert(task)
-
-        let mutation = PendingMutation(
+        try cache.enqueue(PendingMutation(
             target: .task,
             targetID: id,
             type: .toggleCheckbox,
             payload: #"{"isDone":\#(isDone)}"#
-        )
-        try cache.enqueue(mutation)
-
-        do {
-            let context = try await configurationContext()
-            try await notionClient.updateTaskCheckbox(
-                pageID: id,
-                isDone: isDone,
-                fields: context.settings.tasksFieldMapping,
-                token: context.token
-            )
-            task.syncStatus = .synced
-            try cache.upsert(task)
-            try cache.markMutation(id: mutation.id, status: .synced, lastError: nil)
-        } catch {
-            task.syncStatus = .failed
-            try cache.upsert(task)
-            try cache.markMutation(id: mutation.id, status: .failed, lastError: String(describing: error))
-            throw error
-        }
-
+        ))
         return task
+    }
+
+    public func cachedTask(id: String) throws -> TaskItem? {
+        try cache.task(id: id)
     }
 
     public func retryTask(id: String) async throws -> TaskItem {

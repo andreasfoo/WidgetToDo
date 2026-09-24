@@ -63,7 +63,8 @@ public actor NotionRepository {
                 hasPriorityField: refreshedMapping.priority != nil,
                 tasksFieldMapping: refreshedMapping,
                 journalFieldMapping: settings.journalFieldMapping,
-                miniModeState: settings.miniModeState
+                miniModeState: settings.miniModeState,
+                hideCompletedTasks: settings.hideCompletedTasks
             )
             try await settingsStore.save(updatedSettings)
             return makeConfigurationSnapshot(settings: updatedSettings, token: token)
@@ -89,6 +90,26 @@ public actor NotionRepository {
     public func loadMiniModeState() async throws -> MiniModeState {
         let settings = try await settingsStore.load()
         return settings?.miniModeState ?? .default
+    }
+
+    public func loadHideCompletedTasks() async throws -> Bool {
+        try await settingsStore.load()?.hideCompletedTasks ?? false
+    }
+
+    public func saveHideCompletedTasks(_ hideCompletedTasks: Bool) async throws {
+        guard let settings = try await settingsStore.load() else { return }
+        try await settingsStore.save(AppSettings(
+            tasksDatabaseID: settings.tasksDatabaseID,
+            journalDatabaseID: settings.journalDatabaseID,
+            tasksPageURL: settings.tasksPageURL,
+            journalPageURL: settings.journalPageURL,
+            lastValidatedAt: settings.lastValidatedAt,
+            hasPriorityField: settings.hasPriorityField,
+            tasksFieldMapping: settings.tasksFieldMapping,
+            journalFieldMapping: settings.journalFieldMapping,
+            miniModeState: settings.miniModeState,
+            hideCompletedTasks: hideCompletedTasks
+        ))
     }
 
     public func loadAppLanguage() async throws -> AppLanguage {
@@ -167,13 +188,16 @@ public actor NotionRepository {
         }
 
         let hasPriorityField = tasksFieldMapping.priority != nil
+        let existingSettings = try await settingsStore.load()
         let settings = AppSettings(
             tasksDatabaseID: tasksReference.rawValue,
             journalDatabaseID: journalReference.rawValue,
             lastValidatedAt: Date(),
             hasPriorityField: hasPriorityField,
             tasksFieldMapping: tasksFieldMapping,
-            journalFieldMapping: journalFieldMapping
+            journalFieldMapping: journalFieldMapping,
+            miniModeState: existingSettings?.miniModeState ?? .default,
+            hideCompletedTasks: existingSettings?.hideCompletedTasks ?? false
         )
         try await settingsStore.save(settings)
         return settings

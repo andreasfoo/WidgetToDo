@@ -41,12 +41,16 @@ struct ContentView: View {
             case .settings:
                 OnboardingView(
                     viewModel: rootViewModel.onboardingViewModel,
-                mode: .settings,
-                onBack: rootViewModel.returnFromSettings,
-                onResetConfiguration: {
-                    await rootViewModel.resetConfigurationFromSettings()
-                },
-                onLanguageChange: rootViewModel.selectLanguage
+                    mode: .settings,
+                    onBack: rootViewModel.returnFromSettings,
+                    onResetConfiguration: {
+                        await rootViewModel.resetConfigurationFromSettings()
+                    },
+                onLanguageChange: rootViewModel.selectLanguage,
+                hideCompletedTasks: Binding(
+                    get: { rootViewModel.hideCompletedTasks },
+                    set: { rootViewModel.setHideCompletedTasks($0) }
+                )
                 )
                 .frame(width: AppWindowChrome.defaultWidth, height: AppWindowChrome.defaultHeight)
             case .widget:
@@ -89,7 +93,8 @@ struct ContentView: View {
                     },
                     onCollapse: {
                         rootViewModel.collapse()
-                    }
+                    },
+                    hideCompletedTasks: rootViewModel.hideCompletedTasks
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .transition(miniModeTransition)
@@ -145,6 +150,7 @@ final class RootViewModel: ObservableObject {
     @Published var bannerMessageKey: AppText.Key?
     @Published var isMiniMode: Bool = false
     @Published var miniActiveTab: MiniActiveTab = .todo
+    @Published var hideCompletedTasks = false
 
     let languageStore = LanguageStore.shared
 
@@ -218,6 +224,7 @@ final class RootViewModel: ObservableObject {
     }
 
     func bootstrap() async {
+        hideCompletedTasks = (try? await repository.loadHideCompletedTasks()) ?? false
         if let language = try? await repository.loadAppLanguage() {
             languageStore.apply(language)
         }
@@ -278,6 +285,13 @@ final class RootViewModel: ObservableObject {
         }
     }
 
+    func setHideCompletedTasks(_ hideCompletedTasks: Bool) {
+        self.hideCompletedTasks = hideCompletedTasks
+        Task { [weak self] in
+            try? await self?.repository.saveHideCompletedTasks(hideCompletedTasks)
+        }
+    }
+
     func selectLanguage(_ language: AppLanguage) {
         guard languageStore.language != language else { return }
         let previousLanguage = languageStore.language
@@ -332,6 +346,7 @@ struct OnboardingView: View {
     var onBack: (() -> Void)?
     var onResetConfiguration: (() async -> Void)?
     var onLanguageChange: ((AppLanguage) -> Void)?
+    var hideCompletedTasks: Binding<Bool>?
     @EnvironmentObject private var languageStore: LanguageStore
     @State private var isShowingTokenHelp = false
     @State private var activeDatabaseHelpTopic: DatabaseHelpTopic?
@@ -360,6 +375,10 @@ struct OnboardingView: View {
                         } else {
                             onboardingHero
                             languageSection
+                        }
+
+                        if mode == .settings, let hideCompletedTasks {
+                            completedTasksVisibilitySection(hideCompletedTasks)
                         }
 
                         tokenSection
@@ -549,6 +568,25 @@ struct OnboardingView: View {
             settingsDecorationCluster
         }
         .padding(.bottom, 4)
+    }
+
+
+    private func completedTasksVisibilitySection(_ hideCompletedTasks: Binding<Bool>) -> some View {
+        Toggle(isOn: hideCompletedTasks) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(languageStore.text(.hideCompletedTasks))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(OnboardingModalPalette.primaryText)
+                Text(languageStore.text(.hideCompletedTasksDescription))
+                    .font(.system(size: 11))
+                    .foregroundStyle(OnboardingModalPalette.secondaryText)
+            }
+        }
+        .toggleStyle(.switch)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(OnboardingModalPalette.inputBackground))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(OnboardingModalPalette.inputBorder, lineWidth: 1))
     }
 
     private var languageSection: some View {
@@ -1199,6 +1237,7 @@ struct FloatingWidgetView: View {
     let initialActiveTab: MiniActiveTab
     let onActiveTabChange: ((MiniActiveTab) -> Void)?
     let onCollapse: (() -> Void)?
+    let hideCompletedTasks: Bool
 
     init(
         todoViewModel: TodoListViewModel,
@@ -1208,7 +1247,8 @@ struct FloatingWidgetView: View {
         bannerMessageKey: AppText.Key?,
         activeTab: MiniActiveTab = .todo,
         onActiveTabChange: ((MiniActiveTab) -> Void)? = nil,
-        onCollapse: (() -> Void)? = nil
+        onCollapse: (() -> Void)? = nil,
+        hideCompletedTasks: Bool = false
     ) {
         self.todoViewModel = todoViewModel
         self.journalViewModel = journalViewModel
@@ -1220,6 +1260,7 @@ struct FloatingWidgetView: View {
         self.bannerMessageKey = bannerMessageKey
         self.onActiveTabChange = onActiveTabChange
         self.onCollapse = onCollapse
+        self.hideCompletedTasks = hideCompletedTasks
     }
 
     private static func widgetTab(from miniTab: MiniActiveTab) -> WidgetTab {
@@ -1723,6 +1764,10 @@ struct FloatingWidgetView: View {
         }
     }
 
+    private var visibleTasks: [TaskItem] {
+        todoViewModel.tasks.filter { !hideCompletedTasks || !$0.isDone }
+    }
+
     private var taskListView: some View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: 0) {
@@ -1735,9 +1780,9 @@ struct FloatingWidgetView: View {
                         .frame(height: 1)
                 }
 
-                ForEach(todoViewModel.tasks) { task in
+                ForEach(visibleTasks) { task in
                     taskRowView(task)
-                    if task.id != todoViewModel.tasks.last?.id {
+                    if task.id != visibleTasks.last?.id {
                         Rectangle()
                             .fill(FloatingWidgetPalette.dividerColor)
                             .frame(height: 1)

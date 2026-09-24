@@ -72,6 +72,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public let tasksFieldMapping: TaskDatabaseFieldMapping
     public let journalFieldMapping: JournalDatabaseFieldMapping
     public let miniModeState: MiniModeState
+    public let hideCompletedTasks: Bool
 
     enum CodingKeys: String, CodingKey {
         case tasksDatabaseID
@@ -83,6 +84,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case tasksFieldMapping
         case journalFieldMapping
         case miniModeState
+        case hideCompletedTasks
     }
 
     public init(
@@ -94,7 +96,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         hasPriorityField: Bool = true,
         tasksFieldMapping: TaskDatabaseFieldMapping = .legacyDefault,
         journalFieldMapping: JournalDatabaseFieldMapping = .legacyDefault,
-        miniModeState: MiniModeState = .default
+        miniModeState: MiniModeState = .default,
+        hideCompletedTasks: Bool = false
     ) {
         self.tasksDatabaseID = tasksDatabaseID
         self.journalDatabaseID = journalDatabaseID
@@ -105,6 +108,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.tasksFieldMapping = tasksFieldMapping
         self.journalFieldMapping = journalFieldMapping
         self.miniModeState = miniModeState
+        self.hideCompletedTasks = hideCompletedTasks
     }
 
     public init(from decoder: Decoder) throws {
@@ -118,5 +122,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
         tasksFieldMapping = try container.decodeIfPresent(TaskDatabaseFieldMapping.self, forKey: .tasksFieldMapping) ?? .legacyDefault
         journalFieldMapping = try container.decodeIfPresent(JournalDatabaseFieldMapping.self, forKey: .journalFieldMapping) ?? .legacyDefault
         miniModeState = try container.decodeIfPresent(MiniModeState.self, forKey: .miniModeState) ?? .default
+        hideCompletedTasks = try container.decodeIfPresent(Bool.self, forKey: .hideCompletedTasks) ?? false
     }
 }

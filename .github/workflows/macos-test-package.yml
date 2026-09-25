@@ -1,0 +1,44 @@
+name: macOS Test Package
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build unsigned macOS test app
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build Release app
+        run: >
+          xcodebuild
+          -project WidgetToDo.xcodeproj
+          -scheme WidgetToDo
+          -configuration Release
+          -derivedDataPath build
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+          CODE_SIGN_IDENTITY=""
+          build
+
+      - name: Create test package
+        run: |
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/Build/Products/Release/WidgetToDo.app \
+            dist/WidgetToDo-macos-unsigned.zip
+
+      - name: Upload test package
+        uses: actions/upload-artifact@v4
+        with:
+          name: WidgetToDo-macos-unsigned
+          path: dist/WidgetToDo-macos-unsigned.zip
+          retention-days: 3

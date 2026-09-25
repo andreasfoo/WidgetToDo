@@ -17,10 +17,12 @@ public struct NotionPropertySchema: Equatable, Sendable {
     public let name: String
     public let type: String
     public let selectOptions: [NotionSelectOption]
+    public let completedStatusName: String?
 
-    public init(name: String, type: String, selectOptions: [NotionSelectOption] = []) {
+    public init(name: String, type: String, selectOptions: [NotionSelectOption] = [], completedStatusName: String? = nil) {
         self.name = name
         self.type = type
         self.selectOptions = selectOptions
+        self.completedStatusName = completedStatusName
     }
 }

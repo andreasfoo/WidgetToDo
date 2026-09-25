@@ -14,7 +14,14 @@ public actor NotionClient {
     public func fetchDatabaseSchema(databaseID: String, token: String) async throws -> [NotionPropertySchema] {
         let request = try makeRequest(path: "databases/\(databaseID)", method: "GET", token: token)
         let response: DatabaseResponse = try await perform(request)
-        return response.properties.map { NotionPropertySchema(name: $0.key, type: $0.value.type, selectOptions: $0.value.select?.options ?? []) }
+        return response.properties.map {
+            NotionPropertySchema(
+                name: $0.key,
+                type: $0.value.type,
+                selectOptions: $0.value.select?.options ?? [],
+                completedStatusName: $0.value.status.flatMap(Self.completedStatusName)
+            )
+        }
     }
 
     public func queryTasks(on date: Date, databaseID: String, fields: TaskDatabaseFieldMapping, token: String) async throws -> [TaskItem] {
@@ -75,13 +82,14 @@ public actor NotionClient {
     }
 
     public func updateTaskCheckbox(pageID: String, isDone: Bool, fields: TaskDatabaseFieldMapping, token: String) async throws {
-        let body: [String: Any] = [
-            "properties": [
-                fields.done: [
-                    "checkbox": isDone
-                ]
-            ]
-        ]
+        let completionValue: [String: Any]
+        switch fields.doneType {
+        case .checkbox:
+            completionValue = ["checkbox": isDone]
+        case .status:
+            completionValue = ["status": ["name": isDone ? fields.completedStatusName as Any : NSNull()]]
+        }
+        let body: [String: Any] = ["properties": [fields.done: completionValue]]
         let request = try makeRequest(path: "pages/\(pageID)", method: "PATCH", token: token, body: body)
         let _: PageResponse = try await perform(request)
     }
@@ -153,10 +161,10 @@ public actor NotionClient {
                     "start": dateString
                 ]
             ],
-            fields.done: [
-                "checkbox": false
-            ]
         ]
+        if fields.doneType == .checkbox {
+            properties[fields.done] = ["checkbox": false]
+        }
         if hasPriorityField, let priorityField = fields.priority, let priority {
             properties[priorityField] = [
                 "select": [
@@ -384,7 +392,13 @@ public actor NotionClient {
         let date = try parseNotionDate(dateString)
         let priority = fields.priority.flatMap { page.properties[$0]?.select?.name }
         let estimatedMinutes = fields.estimatedMinutes.flatMap { page.properties[$0]?.number }.flatMap { Int($0) }
-        let isDone = page.properties[fields.done]?.checkbox ?? false
+        let isDone: Bool
+        switch fields.doneType {
+        case .checkbox:
+            isDone = page.properties[fields.done]?.checkbox ?? false
+        case .status:
+            isDone = page.properties[fields.done]?.status?.name == fields.completedStatusName
+        }
         return TaskItem(
             id: page.id,
             title: title,
@@ -409,6 +423,11 @@ public actor NotionClient {
             url: page.url.flatMap(URL.init(string:)),
             syncStatus: .synced
         )
+    }
+
+    private static func completedStatusName(_ configuration: StatusConfiguration) -> String? {
+        let completedNames = Set(["done", "completed", "complete", "完成", "已完成", "已办"])
+        return configuration.options.first { completedNames.contains($0.name.lowercased()) }?.name
     }
 
     private static func parseNotionDate(_ raw: String) throws -> Date {
@@ -483,9 +502,11 @@ private struct DatabaseResponse: Decodable {
 private struct DatabaseProperty: Decodable {
     let type: String
     let select: SelectConfiguration?
+    let status: StatusConfiguration?
 }
 
 private struct SelectConfiguration: Decodable { let options: [NotionSelectOption] }
+private struct StatusConfiguration: Decodable { let options: [NotionSelectOption] }
 
 private struct QueryResponse: Decodable {
     let results: [PageResponse]
@@ -502,6 +523,7 @@ private struct PageProperty: Decodable {
     let date: NotionDateProperty?
     let number: Double?
     let select: NotionSelectProperty?
+    let status: NotionSelectProperty?
     let title: [NotionRichText]?
 }
 
